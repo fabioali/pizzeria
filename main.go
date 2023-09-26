@@ -5,6 +5,7 @@ import (
 	"time"
 )
 
+// run simple pizzeria for numOrders of orders
 func run_interval(numOrders []int, pizzeria Pizzeria) {
 	fmt.Printf("===== start run ========\n")
 	for _, v := range numOrders {
@@ -15,17 +16,49 @@ func run_interval(numOrders []int, pizzeria Pizzeria) {
 	}
 	fmt.Printf("===== end run ========\n")
 }
+
+// run the pizzeria with number of orders an measure the time in milliseconds
 func run_interval2(numOrders []int, pizzeria *ConcurrentPizzeria) {
-	fmt.Printf("===== start run ========\n")
+	fmt.Printf("===== start run latency ========\n")
 	for _, v := range numOrders {
 		pizzeria.Reset()
 		tick := time.Now()
 		pizzeria.runConcurrentPizzeria(v)
 		tock := time.Now()
 		fmt.Printf("%d:\t%d\n", v, tock.UnixMilli()-tick.UnixMilli())
+		for i := 0; i < v; i++ {
+			pizza := pizzeria.donePizzas.Next()
+			if pizza == nil {
+				fmt.Printf("Not the correct number of pizzas produced\n")
+				break
+			}
+			//do we care about individual latency
+			//latency := pizza.(*Pizza).finishTime - pizza.(*Pizza).issueTime
+		}
 	}
-	fmt.Printf("===== end run ========\n")
+	fmt.Printf("===== end run latency ========\n")
 }
+
+// run benchmark of throughput times is how long the pizzeria is open for in milliseconds interval is how often a pizza is ordered(milliseconds)
+// measures the number of pizzas produced in the time limit
+func run_throughput(times []int, interval int, pizzeria *ConcurrentPizzeria) {
+	fmt.Printf("===== start run throughput ========\n")
+	for _, v := range times {
+		pizzeria.Reset()
+		pizzeria.runConcurrentPizzeriaBasedOnTime(int64(v), interval)
+		numPizzas := 0
+		for pizza := pizzeria.donePizzas.Next(); pizza != nil; pizza = pizzeria.donePizzas.Next() {
+			//pizza.(*Pizza)
+			numPizzas++
+		}
+		fmt.Printf("%d:\t%d\n", v, numPizzas)
+	}
+	fmt.Printf("===== end run throughput ========\n")
+}
+
+// Test the correctness of the pizzeria
+// Checks if all pizzas are baked, there are no unbaked pizzas or open orders left
+// Checks that each of the orders have been fulfilled
 func test_correctness(numOrders []int, pizzeria *ConcurrentPizzeria) {
 	failed := false
 	for _, v := range numOrders {
@@ -33,6 +66,14 @@ func test_correctness(numOrders []int, pizzeria *ConcurrentPizzeria) {
 		test := make([]bool, v)
 
 		pizzeria.runConcurrentPizzeria(v)
+		if pizzeria.orders.Next() != nil {
+			fmt.Printf("Order not taken\n")
+			failed = true
+		}
+		if pizzeria.preparedPizzas.Next() != nil {
+			fmt.Printf("Pizza left in the oven\n")
+			failed = true
+		}
 		for i := 0; i < v; i++ {
 			pizza := pizzeria.donePizzas.Next()
 			if pizza == nil {
@@ -69,12 +110,8 @@ func main() {
 	fmt.Printf("Begin the baking\n")
 	//var pizzeria = GetSimplePizzeria()
 	//run_interval(ranges, *pizzeria)
-	concurrentPizzeria := getConcurrentPizzeria(1000, 800)
+	concurrentPizzeria := getConcurrentPizzeria(300, 500)
+	test_correctness(ranges, concurrentPizzeria)
 	run_interval2(ranges, concurrentPizzeria)
-	//test_correctness(ranges, concurrentPizzeria)
-}
-
-//@ensures ret == a + b
-func add(a int, b int) (ret int) {
-	return a + b
+	run_throughput(ranges[1:4], 100000, concurrentPizzeria)
 }
