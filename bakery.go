@@ -11,10 +11,12 @@ import (
 * Basic definintions from the task
  */
 type Order struct {
+	id int
 }
 
 type Pizza struct {
 	isBaked bool
+	orderId int
 }
 
 type Oven interface {
@@ -121,15 +123,15 @@ func (pizzeria *ConcurrentPizzeria) runConcurrentPizzeria(numOrders int) {
 		//fmt.Printf("Not all orders are taken: %d\n", pizzeria.orders.Len())
 	}
 }
-func (pizzeria *ConcurrentPizzeria) GetTask() (task, error) {
+func (pizzeria *ConcurrentPizzeria) GetTask() (taskWrapper, error) {
 
 	pizzeria.taskLock.Lock()
 	ret, err := pizzeria.taskList.Pop()
 	pizzeria.taskLock.Unlock()
 	if err != nil {
-		return 0, err
+		return taskWrapper{}, err
 	}
-	return taskWrapper(ret.(taskWrapper)).Task, nil
+	return taskWrapper(ret.(taskWrapper)), nil
 }
 func (pizzeria *ConcurrentPizzeria) AddTask(t task) {
 
