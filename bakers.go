@@ -23,7 +23,9 @@ func (baker BasicBaker) ProcessOrder() Order {
 
 func (baker BasicBaker) Prepare(order Order) *Pizza {
 	time.Sleep(time.Duration(baker.prepareTime) * time.Millisecond)
-	return new(Pizza)
+	ret := new(Pizza)
+	ret.orderId = order.id
+	return ret
 }
 
 func (baker BasicBaker) QualityCheck(pizza *Pizza) (*Pizza, error) {
@@ -46,19 +48,21 @@ type ConcurrentBaker struct {
 	pizzeria    *ConcurrentPizzeria
 }
 
-func (baker ConcurrentBaker) ProcessOrder() Order {
+func (baker ConcurrentBaker) ProcessOrder(id int) Order {
 	baker.isBusy = true
 	time.Sleep(time.Duration(baker.orderTime) * time.Millisecond)
 
 	baker.isBusy = false
-	return Order{}
+	return Order{id: id}
 }
 
 func (baker ConcurrentBaker) Prepare(order Order) *Pizza {
 	baker.isBusy = true
 	time.Sleep(time.Duration(baker.prepareTime) * time.Millisecond)
+	ret := new(Pizza)
+	ret.orderId = order.id
 	baker.isBusy = false
-	return new(Pizza)
+	return ret
 }
 
 func (baker ConcurrentBaker) QualityCheck(pizza *Pizza) (*Pizza, error) {
@@ -87,15 +91,16 @@ func (baker ConcurrentBaker) run() {
 			}
 			continue
 		}
-		switch t {
+		switch t.Task {
 		case takeOrder:
-			//fmt.Printf("take order\n")
-			order := baker.ProcessOrder()
+			//fmt.Printf("take order %d\n", t.id)
+			order := baker.ProcessOrder(t.id)
 			baker.pizzeria.AddOrder(order)
 			baker.pizzeria.AddTask(preparePizza)
 		case preparePizza:
 			//fmt.Printf("prepare pizza\n")
-			pizza := new(Pizza)
+			order := baker.pizzeria.GetOrder()
+			pizza := baker.Prepare(order)
 			baker.pizzeria.AddPizza(pizza, false)
 			baker.pizzeria.AddTask(bakePizza)
 		case bakePizza:
